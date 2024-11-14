@@ -14,17 +14,6 @@ function directoryExists(dir) {
     }
 }
 
-function checkDirectory(dir, callback) {
-    fs.readdir(dir, (err, files) => {
-        if (err) {
-            console.error(`Error reading directory: ${dir}`, err);
-            callback(err);
-            return;
-        }
-        callback(null, files);
-    });
-}
-
 function generateSecretKey(length) {
     return crypto.randomBytes(length).toString('hex').slice(0, length);
 }
@@ -51,6 +40,17 @@ function processChunk(file, start, end, counter, chunk_info) {
     const encrypted_data = encryptData(data, secret_key);
     fs.writeFileSync(`${config.outputDir}chunk${counter}`, encrypted_data);
     chunk_info.keys[counter] = secret_key;
+}
+
+function checkDirectory(dir, callback) {
+    fs.readdir(dir, (err, files) => {
+        if (err) {
+            console.error(`Error reading directory: ${dir}`, err);
+            callback(err);
+            return;
+        }
+        callback(null, files);
+    });
 }
 
 directoryExists(config.inputDir);
@@ -91,6 +91,7 @@ checkDirectory(config.inputDir, (err, files) => {
     };
 
     for (let start = 0; start < size; start += config.chunkSize) {
+        console.log(`Processing chunk ${counter}`);
         processChunk(inputFile, start, Math.min(start + config.chunkSize, size), counter, chunkInfo);
         counter++;
     }
