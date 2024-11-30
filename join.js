@@ -2,93 +2,108 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 const inputDir = 'input/';
-const index_file = inputDir + 'index.json';
+const indexFile = inputDir + 'index.json';
 
-if (!fs.existsSync(index_file)) {
-    console.error('Error: Missing index.json file.');
+if (!fs.existsSync(indexFile)) {
+    console.error('Error: Missing index.json file in the input folder.');
     return;
 }
-const index_data = JSON.parse(fs.readFileSync(index_file, 'utf8'));
-if (!index_data.name) {
-    console.warn('File name missing from index.json.');
-    index_data.name = 'unknown_name';
+
+let indexData;
+try {
+	console.log('Info: Found index.json file.');
+    indexData = JSON.parse(fs.readFileSync(indexFile, 'utf8'));
+} catch (error) {
+	console.error('Error: Failed to read index file:', error.message)
+	return;
 }
-if (!index_data.chunks) {
+
+if (!indexData.name) {
+    console.warn('Warning: File name missing from index.json.');
+    indexData.name = 'unknown_name';
+}
+if (!indexData.chunks) {
     console.error('Error: Not a valid index.json.');
     return;
 }
-const output_file = 'output/' + index_data.name;
-const chunk_count = index_data.chunks;
+const outputFile = 'output/' + indexData.name;
+const chunkCount = indexData.chunks;
 
 async function checkMissingChunks() {
-    let missing_chunks = [];
+    let missingChunks = [];
 
-    for (let i = 1; i <= chunk_count; i++) {
-        const chunkfile_name = `${inputDir}chunk${i}`
-        if (!fs.existsSync(chunkfile_name)) {
-            missing_chunks.push(i);
+    for (let i = 1; i <= chunkCount; i++) {
+        const inputChunkPath = `${inputDir}chunk${i}`
+        if (!fs.existsSync(inputChunkPath)) {
+            missingChunks.push(i);
         }
     }
 
-    return missing_chunks;
+    return missingChunks;
 }
 
 async function checkMissingKeys() {
-    let missing_keys = [];
+    let missingKeys = [];
 
-    for (let i = 1; i <= chunk_count; i++) {
-        if (!index_data.keys[i]) {
-            missing_keys.push(i);
+    for (let i = 1; i <= chunkCount; i++) {
+        if (!indexData.keys[i]) {
+            missingKeys.push(i);
         }
     }
 
-    return missing_keys;
+    return missingKeys;
 }
 
 async function combineChunks() {
     try {
-        const missing_chunks = await checkMissingChunks();
-        const missing_keys = await checkMissingKeys();
-
-        if (missing_chunks.length > 0) {
-            console.error(`Error: Missing chunks: ${missing_chunks.join(', ')}`);
+        const missingChunks = await checkMissingChunks();
+        const missingKeys = await checkMissingKeys();
+        
+        if (fs.existsSync(outputFile)) {
+        	console.warn('Warning: There is already a file with the same name in the output folder; cannot overwrite.');
             return;
         }
 
-        if (missing_keys.length > 0) {
-            console.error(`Error: Missing keys: ${missing_keys.join(', ')}`);
+        if (missingChunks.length > 0) {
+            console.error(`Error: Missing chunks: ${missingChunks.join(', ')}`);
             return;
         }
 
-        const output_stream = fs.createWriteStream(output_file);
+        if (missingKeys.length > 0) {
+            console.error(`Error: Missing keys: ${missingKeys.join(', ')}`);
+            return;
+        }
 
-        for (let i = 1; i <= chunk_count; i++) {
-            const chunkfile_name = `${inputDir}chunk${i}`
+        const outputStream = fs.createWriteStream(outputFile);
+
+        for (let i = 1; i <= chunkCount; i++) {
+        	console.log(`Info: Processing chunk: chunk${i}`); 
+            const inputChunkPath = `${inputDir}chunk${i}`
 
             const algorithm = 'aes-256-cbc';
-            const key = index_data.keys[i];
+            const key = indexData.keys[i];
 
-            const encrypted_content = await fs.promises.readFile(chunkfile_name);
+            const encryptedContent = await fs.promises.readFile(inputChunkPath);
 
-            const iv = encrypted_content.slice(0, 16);
-            const encrypted_data = encrypted_content.slice(16);
+            const iv = encryptedContent.slice(0, 16);
+            const encryptedData = encryptedContent.slice(16);
 
             const decipher = crypto.createDecipheriv(algorithm, key, iv);
 
-            let decrypted = Buffer.concat([decipher.update(encrypted_data), decipher.final()]);
+            let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 
-            output_stream.write(decrypted);
+            outputStream.write(decrypted);
         }
 
-        output_stream.end(() => {
-            console.log(`Combined ${chunk_count} chunk(s) into ${output_file}`);
+        outputStream.end(() => {
+            console.log(`Info: Successfully combined ${chunkCount} chunk(s) into ${outputFile}`);
         });
 
-        output_stream.on('error', (error) => {
-            console.error('Write stream error:', error);
+        outputStream.on('error', (error) => {
+            console.error('Error: Write stream error:', error);
         });
     } catch (error) {
-        console.error('Error combining chunks:', error);
+        console.error('Error: Failed to combine chunks:', error);
     }
 }
 
