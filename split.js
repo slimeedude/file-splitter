@@ -10,7 +10,7 @@ const config = {
 function directoryExists(dir) {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        console.log(`Directory created: ${dir}`);
+        console.log(`Info: Directory created: ${dir}`);
     }
 }
 
@@ -43,9 +43,11 @@ function processChunk(file, start, end, counter, chunk_info) {
 }
 
 function checkDirectory(dir, callback) {
+    directoryExists(config.inputDir);
+    directoryExists(config.outputDir);
     fs.readdir(dir, (err, files) => {
         if (err) {
-            console.error(`Error reading directory: ${dir}`, err);
+            console.error(`Error: Failed to read directory: ${dir}`, err);
             callback(err);
             return;
         }
@@ -53,49 +55,49 @@ function checkDirectory(dir, callback) {
     });
 }
 
-directoryExists(config.inputDir);
-directoryExists(config.outputDir);
+function startSplitting(inputFilePath) {
+    console.log('Info: Processing file:', inputFilePath.split('/').pop());
+
+    const size = fs.statSync(inputFilePath).size;
+    const chunkCount = Math.ceil(size / config.chunkSize);
+
+    let counter = 1;
+    let chunkInfo = {
+        chunks: chunkCount, name: inputFilePath.split('/').pop(), keys: {},
+    };
+
+    for (let start = 0; start < size; start += config.chunkSize) {
+        console.log(`Info: Processing chunk ${counter}`);
+        processChunk(inputFilePath, start, Math.min(start + config.chunkSize, size), counter, chunkInfo);
+        counter++;
+    }
+
+    fs.writeFileSync(`${config.outputDir}index.json`, JSON.stringify(chunkInfo))
+    console.log(`Info: Success. Total chunks created: ${chunkCount}`);
+}
 
 checkDirectory(config.inputDir, (err, files) => {
     if (err) {
-        console.error('Error reading directory: ', err);
+        console.error('Error: Failed to read directory: ', err);
         return;
     }
 
     if (files.length === 0) {
-        console.error('No files found in the input folder.');
+        console.error('Error: No files found in the input folder.');
         return;
     }
 
     if (files.length > 1) {
-        console.warn('Cannot proceed with multiple input files; please input a single file.');
+        console.warn('Warning: Cannot proceed with multiple input files; please input a single file.');
         return;
     }
 
     let outputFolder = fs.readdirSync(config.outputDir);
     if (outputFolder.length !== 0) {
-        console.warn('Output folder must be empty.');
+        console.warn('Warning: Output folder must be empty.');
         return;
     }
-
-    console.log('Processing file: ', files[0]);
-
-    const inputFile = config.inputDir + files[0];
-
-    const size = fs.statSync(inputFile).size;
-    const chunkCount = Math.ceil(size / config.chunkSize);
-
-    let counter = 1;
-    let chunkInfo = {
-        chunks: chunkCount, name: files[0], keys: {},
-    };
-
-    for (let start = 0; start < size; start += config.chunkSize) {
-        console.log(`Processing chunk ${counter}`);
-        processChunk(inputFile, start, Math.min(start + config.chunkSize, size), counter, chunkInfo);
-        counter++;
-    }
-
-    fs.writeFileSync(`${config.outputDir}index.json`, JSON.stringify(chunkInfo))
-    console.log(`Total chunks created: ${chunkCount}`);
+    
+    // All conditions passed, start making chunks
+    startSplitting(config.inputDir + files[0]);
 });
