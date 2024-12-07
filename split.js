@@ -15,7 +15,11 @@ function directoryExists(dir) {
 }
 
 function generateSecretKey(length) {
-    return crypto.randomBytes(length).toString('hex').slice(0, length);
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let randomString = '';
+    const bytes = crypto.randomBytes(length);
+    for (let i = 0; i < length; i++) { randomString += characters[bytes[i] % characters.length]; }
+    return randomString;
 }
 
 function readFileSection(file, start_byte, end_byte) {
