@@ -7,6 +7,14 @@ const config = {
     chunkSize: 24 * 1024 * 1024,
 }
 
+if (config.chunkSize < 1024 * 1024) {
+	console.warn('Warning: config.chunkSize is smaller than 1MB, which can cause problems. Aborting.');
+	return;
+} else if (config.chunkSize % 1 != 0) {
+	console.error('Error: config.chunkSize must be an integer.');
+	return;
+}
+
 function directoryExists(dir) {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -59,7 +67,7 @@ function checkDirectory(dir, callback) {
     });
 }
 
-function startSplitting(inputFilePath) {
+function splitFile(inputFilePath) {
     console.log('Info: Processing file:', inputFilePath.split('/').pop());
 
     const size = fs.statSync(inputFilePath).size;
@@ -103,5 +111,5 @@ checkDirectory(config.inputDir, (err, files) => {
     }
     
     // All conditions passed, start making chunks
-    startSplitting(config.inputDir + files[0]);
+    splitFile(config.inputDir + files[0]);
 });
