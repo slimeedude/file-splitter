@@ -1,10 +1,13 @@
 const fs = require('fs');
+const zlib = require('zlib');
 const crypto = require('crypto');
 
 const config = {
     inputDir: 'input/',
     outputDir: 'output/',
     chunkSize: 24 * 1024 * 1024,
+    secretKeyLength: 32,
+    compression: false,
 }
 
 if (config.chunkSize < 1024 * 1024) {
@@ -48,7 +51,7 @@ function encryptData(data, key) {
 
 function processChunk(file, start, end, counter, chunk_info) {
     const data = readFileSection(file, start, end);
-    const secret_key = generateSecretKey(32);
+    const secret_key = generateSecretKey(config.secretKeyLength);
     const encrypted_data = encryptData(data, secret_key);
     fs.writeFileSync(`${config.outputDir}chunk${counter}`, encrypted_data);
     chunk_info.keys[counter] = secret_key;
@@ -68,7 +71,7 @@ function checkDirectory(dir, callback) {
 }
 
 function splitFile(inputFilePath) {
-    console.log('Info: Processing file:', inputFilePath.split('/').pop());
+    console.log('Info: Splitting file:', inputFilePath.split('/').pop());
 
     const size = fs.statSync(inputFilePath).size;
     const chunkCount = Math.ceil(size / config.chunkSize);
@@ -84,8 +87,51 @@ function splitFile(inputFilePath) {
         counter++;
     }
 
-    fs.writeFileSync(`${config.outputDir}index.json`, JSON.stringify(chunkInfo))
+    fs.writeFileSync(`${config.outputDir}index.json`, JSON.stringify(chunkInfo));
     console.log(`Info: Success. Total chunks created: ${chunkCount}`);
+}
+
+function splitFileCompressed(inputFilePath) {
+    console.log('Info: Compressing and splitting file:', inputFilePath.split('/').pop());
+
+    const deflate = zlib.createDeflate();
+    const input = fs.createReadStream(inputFilePath);
+    const chunkCount = Math.ceil(fs.statSync(inputFilePath).size / config.chunkSize);
+
+    input.pipe(deflate);
+
+    let buffer = Buffer.alloc(0);
+    let counter = 1;
+    let chunkInfo = {
+        chunks: chunkCount, name: inputFilePath.split('/').pop(), keys: {},
+    };
+
+    deflate.on('data', (data) => {
+    	buffer = Buffer.concat([buffer, data]);
+
+        if (buffer.length >= config.chunkSize) {
+        	deflate.pause();
+            const key = generateSecretKey(config.secretKeyLength);
+            fs.writeFileSync(`${config.outputDir}chunk${counter}`, encryptData(buffer, key));
+            chunkInfo.keys[counter] = key;
+            console.log(`Info: Processed chunk ${counter}`);
+            counter++;
+            buffer = Buffer.alloc(0);
+            deflate.resume();
+        }
+    });
+
+    deflate.on('end', () => {
+    	if (buffer.length > 0) {
+            const key = generateSecretKey(config.secretKeyLength);
+    	    fs.writeFileSync(`${config.outputDir}chunk${counter}`, encryptData(buffer, key));
+            chunkInfo.keys[counter] = key;
+            console.log(`Info: Processed chunk ${counter}`);
+    	}
+
+        fs.writeFileSync(`${config.outputDir}index.json`, JSON.stringify(chunkInfo));
+        console.log(`Success. Total chunks created: ${counter}`);
+    });
 }
 
 checkDirectory(config.inputDir, (err, files) => {
@@ -109,7 +155,11 @@ checkDirectory(config.inputDir, (err, files) => {
         console.warn('Warning: Output folder must be empty.');
         return;
     }
-    
+
     // All conditions passed, start making chunks
-    splitFile(config.inputDir + files[0]);
+    if(config.compression) {
+    	splitFileCompressed(config.inputDir + files[0]);
+    } else {
+        splitFile(config.inputDir + files[0]);
+    }
 });
