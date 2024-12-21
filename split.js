@@ -78,7 +78,7 @@ function splitFile(inputFilePath) {
 
     let counter = 1;
     let chunkInfo = {
-        chunks: chunkCount, name: inputFilePath.split('/').pop(), keys: {},
+        chunks: chunkCount, name: inputFilePath.split('/').pop(), keys: {}, compressed: false,
     };
 
     for (let start = 0; start < size; start += config.chunkSize) {
@@ -96,14 +96,13 @@ function splitFileCompressed(inputFilePath) {
 
     const deflate = zlib.createDeflate();
     const input = fs.createReadStream(inputFilePath);
-    const chunkCount = Math.ceil(fs.statSync(inputFilePath).size / config.chunkSize);
 
     input.pipe(deflate);
 
     let buffer = Buffer.alloc(0);
     let counter = 1;
     let chunkInfo = {
-        chunks: chunkCount, name: inputFilePath.split('/').pop(), keys: {},
+        chunks: 0, name: inputFilePath.split('/').pop(), keys: {}, compressed: true,
     };
 
     deflate.on('data', (data) => {
@@ -116,6 +115,7 @@ function splitFileCompressed(inputFilePath) {
             chunkInfo.keys[counter] = key;
             console.log(`Info: Processed chunk ${counter}`);
             counter++;
+            chunkInfo.chunks++
             buffer = Buffer.alloc(0);
             deflate.resume();
         }
@@ -126,6 +126,7 @@ function splitFileCompressed(inputFilePath) {
             const key = generateSecretKey(config.secretKeyLength);
     	    fs.writeFileSync(`${config.outputDir}chunk${counter}`, encryptData(buffer, key));
             chunkInfo.keys[counter] = key;
+            chunkInfo.chunks++
             console.log(`Info: Processed chunk ${counter}`);
     	}
 
