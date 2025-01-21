@@ -54,7 +54,15 @@ async function checkMissingKeys() {
     return missingKeys;
 }
 
+function directoryExists(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Info: Directory created: ${dir}`);
+    }
+}
+
 async function combineChunks() {
+	directoryExists('output/');
     try {
         const missingChunks = await checkMissingChunks();
         const missingKeys = await checkMissingKeys();
