@@ -1,5 +1,5 @@
 # File Splitter
-This tool takes a single file as an input and splits it into encrypted chunks of a desired size.
+This tool takes a single file as an input and splits it into encrypted chunks of a specified size.
 
 Rquirements:
 --------------------
@@ -21,4 +21,4 @@ To join the chunks together:
 
 Warning!
 --------------------
-This code might have bugs, and I do not recommend using it for serious purposes.
+I do not recommend using it for serious tasks; I am not responsible for any data loss. Use at your own risk.
