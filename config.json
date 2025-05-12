@@ -1,0 +1,8 @@
+{
+  "input_dir": "input/",
+  "output_dir": "output/",
+  "chunk_size": 25165824,
+  "safe_size": 1048576,
+  "secret_key_length": 32,
+  "compression": true
+}
